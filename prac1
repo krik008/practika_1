@@ -1,25 +1,91 @@
 #!/bin/bash
-#Функция для отображения справки
+#функция для отображения справки
 show help()
 {
-  echo "Использование: $0 [опции]"
+  echo "использовние: $0 [опции]"
   echo ""
   echo "Опции:"
-  echo "  -u, --users     Вывести список пользователей и их домашнихдиректорий"
-  echo "  -p, --processes   Вывести список запущенных процессов"
-  echo "  -h, --help      Показать эту справку"
-  echo "  -l PATH, --log PATH   Запись вывод в файл по заданному пути"
-  echo "  -e PATH, --errors PATH   Запись ошибки в файл по заданному пути"
+  echo "  -u, --users     вывести список пользователей и их домашнихдиректорий"
+  echo "  -p, --processes   вывести список запущенных процессов"
+  echo "  -h, --help      показать эту справку"
+  echo "  -l PATH, --log PATH   запись вывод в файл по заданному пути"
+  echo "  -e PATH, --errors PATH   запись ошибки в файл по заданному пути"
 }
 
-#Функция для вывода пользователей
+#функция для вывода пользователей
 list_users() {
   getent passwd | awk -F: '{print $1, $6}' | sort 
 }
-#Функция для вывода процессов
+#функция для вывода процессов
 list_processes() {
   ps -eo pid,comm --sort=pid
 }
-#Основная функция
+#основная функция
 main() {
+  local log_file=""
+  local error_file=""
+
+  while getopts ":u:p:hl:e:-:" opt; do
+    case $opt in
+      a)
+                if [[ ! -z "$log_file" ]]; then
+                    exec > "$log_file"
+                fi
+                list_users
+                ;;
+            b)
+                if [[ ! -z "$log_file" ]]; then
+                    exec > "$log_file"
+                fi
+                list_processes
+                ;;
+            c)
+                show_help
+                exit 0
+                ;;
+           d)
+                log_file="$OPTARG"
+                ;;
+            e)
+                error_file="$OPTARG"
+                exec 2> "$error_file"
+                ;;
+            f)
+                case "${OPTARG}" in
+                    users)
+                        list_users
+                        ;;
+                    processes)
+                        list_processes
+                        ;;
+                    help)
+                        show_help
+                        exit 0
+                        ;;
+                    log)
+                        log_file="${!OPTIND}"; OPTIND=$(( OPTIND + 1 ))
+                        ;;
+                    errors)
+                        error_file="${!OPTIND}"; OPTIND=$(( OPTIND + 1 ))
+                        exec 2> "$error_file"
+                        ;;
+              g)
+                  echo "неверный аргумент --${OPTARG}" >&2
+                  show_help >&2
+                  exit 1
+                  ;;
+                esac
+                ;;
+            h)
+                echo "неверный аргумент: -$OPTARG" >&2
+                show_help >&2
+                exit 1
+                ;;
+            i)
+                echo "аргумент -$OPTARG отсутствует." >&2
+                show_help >&2
+                exit 1
+                ;;
+        esac
+    done
 
