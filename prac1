@@ -1,91 +1,92 @@
 #!/bin/bash
-#функция для отображения справки
-show help()
-{
-  echo "использовние: $0 [опции]"
-  echo ""
-  echo "Опции:"
-  echo "  -u, --users     вывести список пользователей и их домашнихдиректорий"
-  echo "  -p, --processes   вывести список запущенных процессов"
-  echo "  -h, --help      показать эту справку"
-  echo "  -l PATH, --log PATH   запись вывод в файл по заданному пути"
-  echo "  -e PATH, --errors PATH   запись ошибки в файл по заданному пути"
-}
 
-#функция для вывода пользователей
+# функция для вывода списка пользователей и их домашних директорий
 list_users() {
-  getent passwd | awk -F: '{print $1, $6}' | sort 
+    cut -d: -f1,6 /etc/passwd | sort
 }
-#функция для вывода процессов
-list_processes() {
-  ps -eo pid,comm --sort=pid
-}
-#основная функция
-main() {
-  local log_file=""
-  local error_file=""
 
-  while getopts ":u:p:hl:e:-:" opt; do
-    case $opt in
-      a)
-                if [[ ! -z "$log_file" ]]; then
-                    exec > "$log_file"
-                fi
+# функция для вывода списка процессов с их идентификаторами
+list_processes() {
+    ps -e -o pid,comm --sort=pid
+}
+
+# функция для вывода справки
+show_help() {
+    echo "использование: $0 [OPTIONS]"
+    echo "-u, --users вывести перечень пользователей и их домашних директорий"
+    echo "-p, --processes вывести перечень запущенных процессов"
+    echo "-h, --help показать справку"
+    echo "-l PATH, --log PATH выводить в файл по указанному пути"
+    echo "-e PATH, --errors PATH выводить ошибки в файл по указанному пути"
+}
+
+# обработчик ошибок
+handle_error() {
+    echo "ошибка: $1" >&2
+    exit 1
+}
+
+# функция для обработки аргументов командной строки
+process_args() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -u|--users)
                 list_users
                 ;;
-            b)
-                if [[ ! -z "$log_file" ]]; then
-                    exec > "$log_file"
-                fi
+            -p|--processes)
                 list_processes
                 ;;
-            c)
+            -h|--help)
                 show_help
                 exit 0
                 ;;
-           d)
-                log_file="$OPTARG"
+            -l)
+                shift
+                if [[ -z $1 ]]; then
+                    handle_error "не указан путь для лог-файла"
+                fi
+                if [[ ! -d $(dirname "$1") ]]; then
+                    handle_error "не существует директория для лог-файла"
+                fi
+                exec > "$1"
                 ;;
-            e)
-                error_file="$OPTARG"
-                exec 2> "$error_file"
+            --log)
+                shift
+                if [[ -z $1 ]]; then
+                    handle_error "не указан путь для лог-файла"
+                fi
+                if [[ ! -d $(dirname "$1") ]]; then
+                    handle_error "не существует директория для лог-файла"
+                fi
+                exec > "$1"
                 ;;
-            f)
-                case "${OPTARG}" in
-                    users)
-                        list_users
-                        ;;
-                    processes)
-                        list_processes
-                        ;;
-                    help)
-                        show_help
-                        exit 0
-                        ;;
-                    log)
-                        log_file="${!OPTIND}"; OPTIND=$(( OPTIND + 1 ))
-                        ;;
-                    errors)
-                        error_file="${!OPTIND}"; OPTIND=$(( OPTIND + 1 ))
-                        exec 2> "$error_file"
-                        ;;
-              g)
-                  echo "неверный аргумент --${OPTARG}" >&2
-                  show_help >&2
-                  exit 1
-                  ;;
-                esac
+            -e)
+                shift
+                if [[ -z $1 ]]; then
+                    handle_error "не указан путь для файла ошибок"
+                fi
+                if [[ ! -d $(dirname "$1") ]]; then
+                    handle_error "не существует директория для файла ошибок"
+                fi
+                exec 2> "$1"
                 ;;
-            h)
-                echo "неверный аргумент: -$OPTARG" >&2
-                show_help >&2
-                exit 1
+            --errors)
+                shift
+                if [[ -z $1 ]]; then
+                    handle_error "не указан путь для файла ошибок"
+                fi
+                if [[ ! -d $(dirname "$1") ]]; then
+                    handle_error "не существует директория для файла ошибок"
+                fi
+                exec 2> "$1"
                 ;;
-            i)
-                echo "аргумент -$OPTARG отсутствует." >&2
-                show_help >&2
-                exit 1
+            *)
+                handle_error "неизвестный параметр $1"
                 ;;
         esac
+        shift
     done
+}
 
+# основная логика программы
+process_args "$@"
